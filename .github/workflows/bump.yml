@@ -1,0 +1,67 @@
+# Homebrew taps have no built-in equivalent of Scoop's Excavator, so this job
+# does the same thing by hand: ask PyPI for the newest corvinos release, rewrite
+# the formula's url + sha256, and commit if anything changed. Without it the
+# formula goes stale silently — it sat on 0.9.52 for ~60 releases until the
+# 2026-07-22 distribution audit caught it.
+name: Bump formula from PyPI
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve latest release on PyPI
+        id: pypi
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.request
+          d = json.load(urllib.request.urlopen("https://pypi.org/pypi/corvinos/json", timeout=30))
+          version = d["info"]["version"]
+          sdist = next(f for f in d["releases"][version] if f["packagetype"] == "sdist")
+          print(f"version={version}")
+          print(f"url={sdist['url']}")
+          print(f"sha256={sdist['digests']['sha256']}")
+          PY
+
+      - name: Rewrite formula
+        id: rewrite
+        env:
+          NEW_URL: ${{ steps.pypi.outputs.url }}
+          NEW_SHA: ${{ steps.pypi.outputs.sha256 }}
+        run: |
+          python3 - <<'PY'
+          import os, re, pathlib
+          p = pathlib.Path("Formula/corvinos.rb")
+          src = p.read_text()
+          out = re.sub(r'^(\s*url\s+")[^"]+(")', lambda m: m.group(1) + os.environ["NEW_URL"] + m.group(2),
+                       src, count=1, flags=re.M)
+          out = re.sub(r'^(\s*sha256\s+")[^"]+(")', lambda m: m.group(1) + os.environ["NEW_SHA"] + m.group(2),
+                       out, count=1, flags=re.M)
+          # Only the stable block may be touched — bail out loudly rather than
+          # committing a formula we mangled.
+          assert out.count(os.environ["NEW_URL"]) == 1, "url substitution did not apply exactly once"
+          assert out.count(os.environ["NEW_SHA"]) == 1, "sha256 substitution did not apply exactly once"
+          p.write_text(out)
+          PY
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit
+        if: steps.rewrite.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: bump corvinos to ${{ steps.pypi.outputs.version }}"
+          git push
