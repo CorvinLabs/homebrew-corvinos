@@ -3,8 +3,8 @@ class Corvinos < Formula
 
   desc "Agentic OS. EU AI Act & GDPR compliance by design — connects Ollama to Discord, Telegram, WhatsApp, Slack & Email"
   homepage "https://corvin-labs.com"
-  url "https://files.pythonhosted.org/packages/1c/91/fc6ca1c9834d2597550e2adcd2bd0a9321e95d1a615bff628a1022f1972a/corvinos-0.10.58.tar.gz"
-  sha256 "54cd5f17256d5839ae7166b78d97fad0abeb16ece2e529333cd5d8946722da5d"
+  url "https://files.pythonhosted.org/packages/15/73/2b30603ec406fc974f5945a85599487e696eef7ff884fc601b38490199da/corvinos-0.10.60.tar.gz"
+  sha256 "b047b3a605213a58a829d0df2f26af7144dda588d6387139779003797ab7def9"
   license "Apache-2.0"
 
   livecheck do
